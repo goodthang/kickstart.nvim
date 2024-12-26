@@ -720,7 +720,8 @@ require('lazy').setup({
 
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
-    event = 'InsertEnter',
+    event = { 'InsertEnter', 'LspAttach' },
+    fix_pairs = true,
     dependencies = {
       -- Snippet Engine & its associated nvim-cmp source
       {
@@ -759,6 +760,13 @@ require('lazy').setup({
       local cmp = require 'cmp'
       local luasnip = require 'luasnip'
       luasnip.config.setup {}
+
+      local has_words_before = function()
+        --if vim.api.nvim_buf_get_option(0, "buftype") == "prompt" then return false end
+        --if vim.api.nvim_get_option_value("buftype") == "prompt"
+        local line, col = unpack(vim.api.nvim_win_get_cursor(0))
+        return col ~= 0 and vim.api.nvim_buf_get_text(0, line - 1, 0, line - 1, col, {})[1]:match '^%s*$' == nil
+      end
 
       cmp.setup {
         snippet = {
@@ -817,6 +825,14 @@ require('lazy').setup({
             end
           end, { 'i', 's' }),
 
+          ['<Tab>'] = vim.schedule_wrap(function(fallback)
+            if cmp.visible() and has_words_before() then
+              cmp.select_next_item { behavior = cmp.SelectBehavior.Select }
+            else
+              fallback()
+            end
+          end),
+
           -- For more advanced Luasnip keymaps (e.g. selecting choice nodes, expansion) see:
           --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
         },
@@ -826,6 +842,7 @@ require('lazy').setup({
             -- set group index to 0 to skip loading LuaLS completions as lazydev recommends it
             group_index = 0,
           },
+          { name = 'copilot' },
           { name = 'nvim_lsp' },
           { name = 'luasnip' },
           { name = 'path' },
@@ -916,6 +933,47 @@ require('lazy').setup({
     --    - Incremental selection: Included, see `:help nvim-treesitter-incremental-selection-mod`
     --    - Show your current context: https://github.com/nvim-treesitter/nvim-treesitter-context
     --    - Treesitter + textobjects: https://github.com/nvim-treesitter/nvim-treesitter-textobjects
+  },
+
+  { -- Github copilot completions
+    'zbirenbaum/copilot-cmp',
+    config = function()
+      require('copilot_cmp').setup()
+    end,
+  },
+
+  { -- Github copilot
+    'zbirenbaum/copilot.lua',
+    opts = {
+      suggestion = {
+        enabled = not vim.g.ai_cmp,
+        auto_trigger = true,
+        keymap = {
+          accept = false, -- handled by nvim-cmp / blink.cmp
+          next = '<M-]>',
+          prev = '<M-[>',
+        },
+      },
+      panel = { enabled = false },
+      filetypes = {
+        javascript = true,
+        markdown = true,
+        help = true,
+      },
+    },
+  },
+
+  {
+    'CopilotC-Nvim/CopilotChat.nvim',
+    dependencies = {
+      { 'github/copilot.vim' }, -- or zbirenbaum/copilot.lua
+      { 'nvim-lua/plenary.nvim', branch = 'master' }, -- for curl, log and async functions
+    },
+    build = 'make tiktoken', -- Only on MacOS or Linux
+    opts = {
+      -- See Configuration section for options
+    },
+    -- See Commands section for default commands if you want to lazy load on them
   },
 
   -- The following comments only work if you have downloaded the kickstart repo, not just copy pasted the
